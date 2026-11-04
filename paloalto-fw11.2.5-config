@@ -8,6 +8,7 @@ set network interface ethernet ethernet1/1 layer3 units ethernet1/1.10 interface
 set network interface ethernet ethernet1/1 layer3 units ethernet1/1.20 interface-management-profile MGMT-PING
 set network interface ethernet ethernet1/1 layer3 units ethernet1/1.30 interface-management-profile MGMT-PING
 set network interface ethernet ethernet1/1 layer3 units ethernet1/1.40 interface-management-profile MGMT-PING
+commit
 
 // Configure network links and tunnel interfaces
 set network interface ethernet ethernet1/2 layer3 ip 192.168.0.134/30
@@ -18,6 +19,7 @@ set network interface tunnel units tunnel.1 ip 172.16.0.2/30
 set network interface tunnel units tunnel.1 interface-management-profile MGMT-PING
 set network interface tunnel units tunnel.2 ip 172.16.0.6/30
 set network interface tunnel units tunnel.2 interface-management-profile MGMT-PING
+commit
 
 //Configure zones and virtual router
 set zone INSIDE network layer3 [ ethernet1/1.10 ethernet1/1.20 ethernet1/1.30 ethernet1/1.40 ]
@@ -70,6 +72,80 @@ commit
 set rulebase security rules INSIDE-TO-VPN from INSIDE to VPN source any destination any application any service any action allow log-end yes
 set rulebase security rules VPN-TO-INSIDE from VPN to INSIDE source any destination any application any service any action allow log-end yes
 
-//DHCP Relay
-set network dhcp interface ethernet1/1.20 relay ip enabled yes server 10.2.10.3
+
+
+
+set network profiles interface-management-profile MGMT-PING ping yes
+// Configure trunk and VLAN subinterfaces
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.10 tag 10 ip 10.2.10.1/24
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.20 tag 20 ip 10.2.20.1/24
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.30 tag 30 ip 10.2.30.1/24
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.40 tag 40 ip 10.2.40.1/24
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.10 interface-management-profile MGMT-PING
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.20 interface-management-profile MGMT-PING
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.30 interface-management-profile MGMT-PING
+set network interface ethernet ethernet1/1 layer3 units ethernet1/1.40 interface-management-profile MGMT-PING
 commit
+
+// Configure network links and tunnel interfaces
+set network interface ethernet ethernet1/2 layer3 ip 192.168.0.133/30
+set network interface ethernet ethernet1/2 layer3 interface-management-profile MGMT-PING
+set network interface ethernet ethernet1/3 layer3 ip 192.168.0.129/30
+set network interface ethernet ethernet1/3 layer3 interface-management-profile MGMT-PING
+set network interface tunnel units tunnel.1 ip 172.16.0.1/30
+set network interface tunnel units tunnel.1 interface-management-profile MGMT-PING
+set network interface tunnel units tunnel.2 ip 172.16.0.5/30
+set network interface tunnel units tunnel.2 interface-management-profile MGMT-PING
+commit
+
+//Configure zones and virtual router
+set zone INSIDE network layer3 [ ethernet1/1.10 ethernet1/1.20 ethernet1/1.30 ethernet1/1.40 ]
+set zone TRANSIT network layer3 [ ethernet1/2 ethernet1/3 ]
+set zone VPN network layer3 [ tunnel.1 tunnel.2 ]
+set network virtual-router default interface [ ethernet1/1.10 ethernet1/1.20 ethernet1/1.30 ethernet1/1.40 ethernet1/2 ethernet1/3 tunnel.1 tunnel.2 ]
+
+//Set crypto profiles
+set network ike crypto-profiles ike-crypto-profiles IKE-PROF dh-group group14 encryption aes-256-cbc hash sha256 lifetime hours 8
+set network ike crypto-profiles ipsec-crypto-profiles IPSEC-PROF esp encryption aes-256-cbc authentication sha256
+set network ike crypto-profiles ipsec-crypto-profiles IPSEC-PROF dh-group group14 lifetime hours 1
+
+//Set IKE gateways and tunnels
+set network ike gateway GW-LINK1 protocol version ikev2
+set network ike gateway GW-LINK1 protocol ikev2 ike-crypto-profile IKE-PROF
+set network ike gateway GW-LINK1 protocol ikev2 dpd enable yes
+set network ike gateway GW-LINK1 local-address interface ethernet1/3
+set network ike gateway GW-LINK1 peer-address ip 192.168.0.130
+set network ike gateway GW-LINK1 authentication pre-shared-key key <PSK-LINK1>
+set network ike gateway GW-LINK2 protocol version ikev2
+set network ike gateway GW-LINK2 protocol ikev2 ike-crypto-profile IKE-PROF
+set network ike gateway GW-LINK2 protocol ikev2 dpd enable yes
+set network ike gateway GW-LINK2 local-address interface ethernet1/2
+set network ike gateway GW-LINK2 peer-address ip 192.168.0.134
+set network ike gateway GW-LINK2 authentication pre-shared-key key <PSK-LINK2>
+set network tunnel ipsec TUN-LINK1 auto-key ike-gateway GW-LINK1
+set network tunnel ipsec TUN-LINK1 auto-key ipsec-crypto-profile IPSEC-PROF
+set network tunnel ipsec TUN-LINK1 tunnel-interface tunnel.1
+set network tunnel ipsec TUN-LINK2 auto-key ike-gateway GW-LINK2
+set network tunnel ipsec TUN-LINK2 auto-key ipsec-crypto-profile IPSEC-PROF
+set network tunnel ipsec TUN-LINK2 tunnel-interface tunnel.2
+
+//Configure Routes
+set network virtual-router default protocol router-id 2.2.2.2
+set network virtual-router default protocol ospf enable yes
+set network virtual-router default protocol ospf area 0.0.0.0 type normal
+set network virtual-router default protocol ospf area 0.0.0.0 interface tunnel.1 enable yes
+set network virtual-router default protocol ospf area 0.0.0.0 interface tunnel.1 link-type p2p
+set network virtual-router default protocol ospf area 0.0.0.0 interface tunnel.1 metric 20
+set network virtual-router default protocol ospf area 0.0.0.0 interface tunnel.2 enable yes
+set network virtual-router default protocol ospf area 0.0.0.0 interface tunnel.2 link-type p2p
+set network virtual-router default protocol ospf area 0.0.0.0 interface tunnel.2 metric 10
+set network virtual-router default protocol ospf area 0.0.0.0 interface ethernet1/1.10 enable yes passive yes
+set network virtual-router default protocol ospf area 0.0.0.0 interface ethernet1/1.20 enable yes passive yes
+set network virtual-router default protocol ospf area 0.0.0.0 interface ethernet1/1.30 enable yes passive yes
+set network virtual-router default protocol ospf area 0.0.0.0 interface ethernet1/1.40 enable yes passive yes
+commit
+
+//Security Policy
+set rulebase security rules INSIDE-TO-VPN from INSIDE to VPN source any destination any application any service any action allow log-end yes
+set rulebase security rules VPN-TO-INSIDE from VPN to INSIDE source any destination any application any service any action allow log-end yes
+
