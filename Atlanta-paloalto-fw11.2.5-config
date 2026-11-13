@@ -1,12 +1,12 @@
 // Configure trunk and VLAN subinterfaces
 set network profiles interface-management-profile MGMT-PING ping yes
-set network interface ethernet ethernet layer3 ip 10.1.100.2/30
+set network interface ethernet ethernet layer3 ip 10.2.100.2/30
 commit
 
 // Configure network tunnel interfaces
-set network interface tunnel units tunnel.1 ip 172.16.0.2/30
+set network interface tunnel units tunnel.1 ip 172.16.0.1/30
 set network interface tunnel units tunnel.1 interface-management-profile MGMT-PING
-set network interface tunnel units tunnel.2 ip 172.16.0.6/30
+set network interface tunnel units tunnel.2 ip 172.16.0.5/30
 set network interface tunnel units tunnel.2 interface-management-profile MGMT-PING
 commit
 
@@ -42,7 +42,7 @@ set network tunnel ipsec TUN-LINK2 auto-key ipsec-crypto-profile IPSEC-PROF
 set network tunnel ipsec TUN-LINK2 tunnel-interface tunnel.2
 
 //Configure Routes
-set network virtual-router default protocol router-id 1.1.1.1
+set network virtual-router default protocol router-id 2.2.2.2
 set network virtual-router default protocol ospf enable yes
 set network virtual-router default protocol ospf area 0.0.0.0 type normal
 set network virtual-router default protocol ospf area 0.0.0.0 interface tunnel.1 enable yes
